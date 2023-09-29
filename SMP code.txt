@@ -1,0 +1,152 @@
+import pandas as pd
+import yfinance as yf
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from keras.models import Sequential
+from keras.layers import Dense, LSTM
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+from datetime import datetime
+
+# Section 1: Data Collection
+nifty50_symbols = [
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "HDFC.NS",
+    "ICICIBANK.NS", "KOTAKBANK.NS", "ITC.NS", "LT.NS", "AXISBANK.NS",
+    "POWERGRID.NS", "HINDUNILVR.NS", "SUNPHARMA.NS", "BAJFINANCE.NS", "ADANIPORTS.NS",
+    "ASIANPAINT.NS", "TITAN.NS", "BHARTIARTL.NS", "HCLTECH.NS", "MARUTI.NS",
+    "JSWSTEEL.NS", "BRITANNIA.NS", "ULTRACEMCO.NS", "COALINDIA.NS", "BAJAJ-AUTO.NS",
+    "WIPRO.NS", "HEROMOTOCO.NS", "DRREDDY.NS", "SHREECEM.NS", "NTPC.NS",
+    "TECHM.NS", "CIPLA.NS", "GRASIM.NS", "NESTLEIND.NS", "ONGC.NS",
+    "DIVISLAB.NS", "ICICIPRULI.NS", "SBILIFE.NS", "HDFCLIFE.NS", "ULTRACEMCO.NS",
+    "IOC.NS", "BAJAJFINSV.NS", "INDUSINDBK.NS", "M&M.NS", "BAJAJ-AUTO.NS",
+    "ADANIGREEN.NS", "UPL.NS", "BPCL.NS", "TATAMOTORS.NS", "RELIANCE.NS"
+]
+
+start_date = "2010-01-01"
+end_date = datetime.now().strftime("%Y-%m-%d")
+nifty50_data = pd.DataFrame()
+
+def download_stock_data(symbols, start_date, end_date):
+    for symbol in symbols:
+        try:
+            df = yf.download(symbol, start=start_date, end=end_date)
+            nifty50_data[symbol] = df['Adj Close']
+        except Exception as e:
+            print(f"Failed to download {symbol}: {e}")
+
+download_stock_data(nifty50_symbols, start_date, end_date)
+
+nifty50_data.to_csv(f'nifty50_stock_prices_{start_date}_{end_date}.csv')
+
+# Section 2: Data Loading and Preprocessing
+file_path = f'nifty50_stock_prices_{start_date}_{end_date}.csv'
+data = pd.read_csv(file_path)
+
+# Display available company symbols and names
+company_symbols = data.columns[1:]  # Exclude the 'Date' column
+company_names = [
+    "Reliance Industries Ltd.", "Tata Consultancy Services Ltd.", "HDFC Bank Ltd.", "Infosys Ltd.", "Housing Development Finance Corporation Ltd.",
+    "ICICI Bank Ltd.", "Kotak Mahindra Bank Ltd.", "ITC Ltd.", "Larsen & Toubro Ltd.", "Axis Bank Ltd.",
+    "Power Grid Corporation of India Ltd.", "Hindustan Unilever Ltd.", "Sun Pharmaceutical Industries Ltd.", "Bajaj Finance Ltd.", "Adani Ports and Special Economic Zone Ltd.",
+    "Asian Paints Ltd.", "Titan Company Ltd.", "Bharti Airtel Ltd.", "HCL Technologies Ltd.", "Maruti Suzuki India Ltd.",
+    "JSW Steel Ltd.", "Britannia Industries Ltd.", "UltraTech Cement Ltd.", "Coal India Ltd.", "Bajaj Auto Ltd.",
+    "Wipro Ltd.", "Hero MotoCorp Ltd.", "Dr. Reddy's Laboratories Ltd.", "Shree Cement Ltd.", "NTPC Ltd.",
+    "Tech Mahindra Ltd.", "Cipla Ltd.", "Grasim Industries Ltd.", "Nestle India Ltd.", "Oil and Natural Gas Corporation Ltd.",
+    "Divi's Laboratories Ltd.", "ICICI Prudential Life Insurance Company Ltd.", "SBI Life Insurance Company Ltd.", "HDFC Life Insurance Company Ltd.", "UltraTech Cement Ltd.",
+    "Indian Oil Corporation Ltd.", "Bajaj Finserv Ltd.", "IndusInd Bank Ltd.", "Mahindra & Mahindra Ltd.", "Bajaj Auto Ltd.",
+    "Adani Green Energy Ltd.", "UPL Ltd.", "Bharat Petroleum Corporation Ltd.", "Tata Motors Ltd.", "Reliance Industries Ltd."
+]
+
+# Ask the user to select a company symbol
+print("Available company symbols and names:")
+for i, (symbol, name) in enumerate(zip(company_symbols, company_names), 1):
+    print(f"{i}. {symbol} - {name}")
+
+selection = int(input("Enter the number corresponding to the company symbol you want to predict: ")) - 1
+
+company_symbol = company_symbols[selection]
+company_name = company_names[selection]
+
+# Ask the user for the date for which they want to make predictions
+prediction_date = input("Enter the date for prediction (YYYY-MM-DD): ")
+
+# Extract the selected company's data up to the prediction date
+selected_company_data = data.loc[data['Date'] <= prediction_date, [company_symbol]]
+prices = selected_company_data.values
+prices = prices.reshape(-1, 1)
+
+# Normalize the data to a range between 0 and 1
+scaler = MinMaxScaler()
+prices = scaler.fit_transform(prices)
+
+# Split the data into training and testing sets
+train_size = int(len(prices) * 0.8)
+train_data = prices[:train_size]
+test_data = prices[train_size:]
+
+# Section 3: Creating Sequences for LSTM
+sequence_length = 60
+
+def create_sequences(data, sequence_length):
+    X, y = [], []
+    for i in range(len(data) - sequence_length):
+        X.append(data[i:i+sequence_length])
+        y.append(data[i+sequence_length])
+    return np.array(X), np.array(y)
+
+X_train, y_train = create_sequences(train_data, sequence_length)
+X_test, y_test = create_sequences(test_data, sequence_length)
+
+# Section 4: Building the LSTM Model
+model = Sequential()
+model.add(LSTM(units=50, return_sequences=True, input_shape=(sequence_length, 1)))
+model.add(LSTM(units=50, return_sequences=False))
+model.add(Dense(units=25))
+model.add(Dense(units=1))
+model.compile(optimizer='adam', loss='huber')
+
+# Section 5: Callbacks
+early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+model_checkpoint = ModelCheckpoint('best_model.h5', save_best_only=True, save_weights_only=True, monitor='val_loss', mode='min', verbose=1)
+
+# Section 6: Model Training
+history = model.fit(
+    X_train, y_train,
+    epochs=100,
+    batch_size=64,
+    validation_data=(X_test, y_test),
+    callbacks=[early_stopping, model_checkpoint],
+    verbose=1
+)
+
+# Section 7: Making Predictions
+predictions = model.predict(X_test)
+predictions = scaler.inverse_transform(predictions)
+
+# Section 8: Calculating Evaluation Metrics
+rmse = np.sqrt(mean_squared_error(scaler.inverse_transform(y_test), predictions))
+mae = mean_absolute_error(scaler.inverse_transform(y_test), predictions)
+r2 = r2_score(scaler.inverse_transform(y_test), predictions)
+
+print(f'Root Mean Squared Error (RMSE): {rmse}')
+print(f'Mean Absolute Error (MAE): {mae}')
+print(f'R-squared (R2) Score: {r2}')
+
+# Section 10: Plot Training & Validation Loss
+plt.figure(figsize=(16, 8))
+plt.subplot(1, 2, 1)
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.legend()
+plt.title('Loss Over Epochs')
+
+plt.subplot(1, 2, 2)
+plt.title(f'Stock Price Prediction for {company_name} on {prediction_date}')
+plt.xlabel('Date')
+plt.ylabel('Close Price (scaled)')
+plt.plot(scaler.inverse_transform(y_test), label='Actual')
+plt.plot(predictions, label='Predicted')
+plt.legend()
+
+plt.show()

@@ -1,0 +1,46 @@
+**Process of the CodeClause Internship Stock Market Prediction Project:**
+
+1. **Data Collection:**
+   - The project starts by collecting historical stock price data for a predefined list of Nifty 50 companies from Yahoo Finance.
+
+2. **Data Loading and Preprocessing:**
+   - The collected data is loaded from a CSV file.
+   - Users are presented with a list of available company symbols and names to choose from.
+   - Users select a specific company symbol and a prediction date.
+
+3. **Creating Sequences for LSTM:**
+   - Time series data is divided into sequences suitable for training the LSTM model.
+
+4. **Building the LSTM Model:**
+   - An LSTM neural network model is constructed using the Keras library.
+   - The model architecture consists of LSTM layers followed by dense layers, suitable for time series prediction.
+
+5. **Callbacks Setup:**
+   - Callbacks like early stopping and model checkpointing are configured to monitor and improve training.
+
+6. **Model Training:**
+   - The LSTM model is trained using historical stock price data.
+   - Hyperparameters such as the number of epochs and batch size are defined for training.
+
+7. **Making Predictions:**
+   - The trained model is used to make predictions for the selected company's stock price on the specified prediction date.
+   - Predictions are transformed back to the original price scale for meaningful interpretation.
+
+8. **Calculating Evaluation Metrics:**
+   - Evaluation metrics including Root Mean Squared Error (RMSE), Mean Absolute Error (MAE), and R-squared (R2) are calculated to assess the accuracy of the predictions.
+
+9. **Results Visualization:**
+   - Visualizations are generated to display the training and validation loss over epochs.
+   - Actual vs. predicted stock prices are plotted to visualize the model's performance.
+
+10. **GitHub Repository:**
+    - The project code, including the script and README.md, is hosted on a GitHub repository for easy sharing and collaboration.
+
+11. **User Interaction:**
+    - Users can run the script, select a company, and observe predictions interactively.
+
+12. **Contribution and Licensing:**
+    - The repository encourages contributions from others.
+    - The project is licensed under the MIT License to allow for open collaboration.
+
+This project enables users to gain insights into stock price prediction using LSTM neural networks and provides a practical example of time series forecasting in financial markets.
